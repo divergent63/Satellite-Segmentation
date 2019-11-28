@@ -1,20 +1,24 @@
 #coding=utf-8
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import argparse
 import numpy as np  
-from keras.models import Sequential  
-from keras.layers import Conv2D,MaxPooling2D,UpSampling2D,BatchNormalization,Reshape,Permute,Activation  
-from keras.utils.np_utils import to_categorical  
-from keras.preprocessing.image import img_to_array  
-from keras.callbacks import ModelCheckpoint  
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D,MaxPooling2D,UpSampling2D,BatchNormalization,Reshape,Permute,Activation
+from tensorflow.keras.utils.np_utils import to_categorical
+from tensorflow.keras.preprocessing.image import img_to_array
+from tensorflow.keras.callbacks import ModelCheckpoint
 from sklearn.preprocessing import LabelEncoder  
-from PIL import Image  
+# from PIL import Image
 import matplotlib.pyplot as plt  
 import cv2
 import random
 import os
+from pathlib import Path
+
+from tensorflow.keras import backend as K
+K.set_image_dim_ordering('th')
+
 from tqdm import tqdm  
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 seed = 7  
@@ -43,7 +47,7 @@ def load_img(path, grayscale=False):
     return img
 
 
-filepath ='./train/'  
+filepath ='./train/'
 
 def get_train_val(val_rate = 0.25):
     train_url = []    
@@ -213,8 +217,8 @@ def train(args):
     train_set,val_set = get_train_val()
     train_numb = len(train_set)  
     valid_numb = len(val_set)  
-    print ("the number of train data is",train_numb)  
-    print ("the number of val data is",valid_numb)
+    print("the number of train data is",train_numb)
+    print("the number of val data is",valid_numb)
     H = model.fit_generator(generator=generateData(BS,train_set),steps_per_epoch=train_numb//BS,epochs=EPOCHS,verbose=1,  
                     validation_data=generateValidData(BS,val_set),validation_steps=valid_numb//BS,callbacks=callable,max_q_size=1)  
 
@@ -237,8 +241,8 @@ def args_parse():
     # construct the argument parse and parse the arguments
     ap = argparse.ArgumentParser()
     ap.add_argument("-a", "--augment", help="using data augment or not",
-                    action="store_true", default=False)
-    ap.add_argument("-m", "--model", required=True,
+                    action="store_true", default=True)
+    ap.add_argument("-m", "--model", required=False,
                     help="path to output model")
     ap.add_argument("-p", "--plot", type=str, default="plot.png",
                     help="path to output accuracy/loss plot")
@@ -249,7 +253,16 @@ def args_parse():
 if __name__=='__main__':  
     args = args_parse()
     if args['augment'] == True:
-        filepath ='./aug/train/'
+        if Path(Path(os.getcwd()).parent.parent.parent.parent.parent / 'data1' / 'remote_sensing' / 'remote_sensing_image').exists():
+            filepath = str(Path(os.getcwd()).parent.parent.parent.parent.parent / 'data1' / 'remote_sensing' / 'remote_sensing_image' / 'train') + '/'
+        else:
+            filepath = str(Path(Path(os.getcwd()).parent) / 'data' / 'seg_train' / 'train') + '/'
 
-    train(args)  
-    #predict()  
+    args['model'] = Path(Path(os.getcwd()).parent) / 'model'
+    if not Path(args['model']).exists():
+        Path(args['model']).mkdir(parents=True)
+    args['model'] = str(args['model'] / 'model.h5')
+
+    train(args)
+    #predict()
+

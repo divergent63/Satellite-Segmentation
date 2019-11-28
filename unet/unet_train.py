@@ -12,19 +12,24 @@ from keras.callbacks import ModelCheckpoint
 from sklearn.preprocessing import LabelEncoder  
 from keras.models import Model
 from keras.layers.merge import concatenate
-from PIL import Image  
+# from PIL import Image
 import matplotlib.pyplot as plt  
 import cv2
 import random
 import os
-from tqdm import tqdm  
-os.environ["CUDA_VISIBLE_DEVICES"] = "4"
+
+from pathlib import Path
+# from tqdm import tqdm
+from keras import backend as K
+K.set_image_dim_ordering('th')
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 seed = 7  
 np.random.seed(seed)  
   
 #data_shape = 360*480  
-img_w = 256  
-img_h = 256  
+img_w = 256
+img_h = 256
 #有一个为背景  
 #n_label = 4+1  
 n_label = 1
@@ -39,9 +44,9 @@ image_sets = ['1.png','2.png','3.png']
 
 def load_img(path, grayscale=False):
     if grayscale:
-        img = cv2.imread(path,cv2.IMREAD_GRAYSCALE)
+        img = cv2.imread((path),cv2.IMREAD_GRAYSCALE)
     else:
-        img = cv2.imread(path)
+        img = cv2.imread(str(path))
         img = np.array(img,dtype="float") / 255.0
     return img
 
@@ -52,7 +57,7 @@ def get_train_val(val_rate = 0.25):
     train_url = []    
     train_set = []
     val_set  = []
-    for pic in os.listdir(filepath + 'src'):
+    for pic in os.listdir(filepath / 'src'):
         train_url.append(pic)
     random.shuffle(train_url)
     total_num = len(train_url)
@@ -74,10 +79,12 @@ def generateData(batch_size,data=[]):
         for i in (range(len(data))): 
             url = data[i]
             batch += 1 
-            img = load_img(filepath + 'src/' + url)
+            # img = load_img(filepath + 'src/' + url)
+            img = load_img(Path(filepath / 'src' / url))
+
             img = img_to_array(img)  
             train_data.append(img)  
-            label = load_img(filepath + 'label/' + url, grayscale=True) 
+            label = load_img(str(filepath) + '/label/' + url, grayscale=True)
             label = img_to_array(label)
             train_label.append(label)  
             if batch % batch_size==0: 
@@ -157,13 +164,16 @@ def unet():
 
     model = Model(inputs=inputs, outputs=conv10)
     model.compile(optimizer='Adam', loss='binary_crossentropy', metrics=['accuracy'])
+    model.summary()
     return model
 
 
   
 def train(args): 
     EPOCHS = 10
-    BS = 16
+    # BS = 16
+    BS = 1
+
     #model = SegNet()  
     model = unet()
     modelcheck = ModelCheckpoint(args['model'],monitor='val_acc',save_best_only=True,mode='max')  
@@ -174,7 +184,7 @@ def train(args):
     print ("the number of train data is",train_numb)  
     print ("the number of val data is",valid_numb)
     H = model.fit_generator(generator=generateData(BS,train_set),steps_per_epoch=train_numb//BS,epochs=EPOCHS,verbose=1,  
-                    validation_data=generateValidData(BS,val_set),validation_steps=valid_numb//BS,callbacks=callable,max_q_size=1)  
+                    validation_data=generateValidData(BS,val_set),validation_steps=valid_numb//BS,callbacks=callable,max_q_size=1)
 
     # plot the training loss and accuracy
     plt.style.use("ggplot")
@@ -196,9 +206,9 @@ def args_parse():
     # construct the argument parse and parse the arguments
     ap = argparse.ArgumentParser()
     ap.add_argument("-d", "--data", help="training data's path",
-                    default=True)
-    ap.add_argument("-m", "--model", required=True,
-                    help="path to output model")
+                    required=False, default="/data/BDCI2017-jiage")
+    ap.add_argument("-m", "--model", required=False,
+                    help="path to output model", default="/model")
     ap.add_argument("-p", "--plot", type=str, default="plot.png",
                     help="path to output accuracy/loss plot")
     args = vars(ap.parse_args()) 
@@ -207,6 +217,12 @@ def args_parse():
 
 if __name__=='__main__':  
     args = args_parse()
+    # args['data'] = "/data/BDCI2017-jiage/unet_train/buildings/"
+    args['data'] = "data/unet_buildings/"
+    args['data'] = Path(Path(os.getcwd()).parent) / 'data' / 'unet_buildings'
+
+    args['model'] = Path(os.getcwd()) / 'model'
+
     filepath = args['data']
     train(args)  
     #predict()  
